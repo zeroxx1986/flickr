@@ -193,6 +193,7 @@ func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name st
 		if err != nil {
 			log.Print(err)
 			result <- nil
+			return
 		}
 
 		apiResp := &UploadResponse{}
