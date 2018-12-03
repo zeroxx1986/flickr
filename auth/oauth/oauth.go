@@ -2,7 +2,7 @@
 package oauth
 
 import (
-	"gopkg.in/masci/flickr.v2"
+	"github.com/zeroxx1986/flickr"
 )
 
 // Response type representing data returned by CheckToken

@@ -1,7 +1,7 @@
 package photos
 
 import (
-	"gopkg.in/masci/flickr.v2"
+	"github.com/zeroxx1986/flickr"
 )
 
 type PhotoInfo struct {

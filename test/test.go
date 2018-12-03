@@ -2,7 +2,7 @@
 package test
 
 import (
-	"gopkg.in/masci/flickr.v2"
+	"github.com/zeroxx1986/flickr"
 )
 
 // Response type used by Login function
