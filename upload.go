@@ -44,7 +44,7 @@ func streamUploadBody(client *FlickrClient, photo io.Reader, body *io.PipeWriter
 	// fill the photo field
 	_, err = io.Copy(part, photo)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func streamUploadBody(client *FlickrClient, photo io.Reader, body *io.PipeWriter
 	// close the form writer
 	err = writer.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 		return
 	}
 }
