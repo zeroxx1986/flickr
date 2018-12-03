@@ -127,7 +127,7 @@ func fillArgsWithParams(client *FlickrClient, params *UploadParams) {
 // no parameters will be added to the request and Flickr will set User's
 // default preferences.
 // This call must be signed with write permissions
-func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams) (*UploadResponse, *context.CancelFunc, error) {
+func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams) (chan<- *UploadResponse, *context.CancelFunc, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
@@ -138,12 +138,12 @@ func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams)
 }
 
 // UploadReader does same as UploadFile but the photo file is passed as an io.Reader instead of a file path
-func UploadReader(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams) (*UploadResponse, *context.CancelFunc, error) {
+func UploadReader(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams) (chan<- *UploadResponse, *context.CancelFunc, error) {
 	return UploadReaderWithClient(client, photoReader, name, optionalParams, nil)
 }
 
 // UploadReaderWithClient does same as UploadReader but allows passing a custom httpClient
-func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams, httpClient *http.Client) (*UploadResponse, *context.CancelFunc, error) {
+func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams, httpClient *http.Client) (chan<- *UploadResponse, *context.CancelFunc, error) {
 	client.Init()
 	client.EndpointUrl = UPLOAD_ENDPOINT
 	client.HTTPVerb = "POST"
@@ -186,13 +186,19 @@ func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name st
 		httpClient = &http.Client{Transport: tr}
 	}
 
+	result := make(chan *UploadResponse)
 	// perform upload request streaming the file
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
+	go func() {
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			log.Print(err)
+			result <- nil
+		}
 
-	apiResp := &UploadResponse{}
-	err = parseApiResponse(resp, apiResp)
-	return apiResp, &cancel, err
+		apiResp := &UploadResponse{}
+		err = parseApiResponse(resp, apiResp)
+		result <- apiResp
+	}()
+
+	return result, &cancel, err
 }
