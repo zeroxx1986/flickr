@@ -1,6 +1,7 @@
 package flickr
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
@@ -126,10 +127,10 @@ func fillArgsWithParams(client *FlickrClient, params *UploadParams) {
 // no parameters will be added to the request and Flickr will set User's
 // default preferences.
 // This call must be signed with write permissions
-func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams) (*UploadResponse, error) {
+func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams) (*UploadResponse, *context.CancelFunc, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer file.Close()
 
@@ -137,12 +138,12 @@ func UploadFile(client *FlickrClient, path string, optionalParams *UploadParams)
 }
 
 // UploadReader does same as UploadFile but the photo file is passed as an io.Reader instead of a file path
-func UploadReader(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams) (*UploadResponse, error) {
+func UploadReader(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams) (*UploadResponse, *context.CancelFunc, error) {
 	return UploadReaderWithClient(client, photoReader, name, optionalParams, nil)
 }
 
 // UploadReaderWithClient does same as UploadReader but allows passing a custom httpClient
-func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams, httpClient *http.Client) (*UploadResponse, error) {
+func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name string, optionalParams *UploadParams, httpClient *http.Client) (*UploadResponse, *context.CancelFunc, error) {
 	client.Init()
 	client.EndpointUrl = UPLOAD_ENDPOINT
 	client.HTTPVerb = "POST"
@@ -158,17 +159,19 @@ func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name st
 	r, w := io.Pipe()
 	go streamUploadBody(client, photoReader, w, name, boundary)
 
-	// create an HTTP Request
+	// create an HTTP Request wich cancel context
+	ctx, cancel := context.WithCancel(context.Background())
 	req, err := http.NewRequest("POST", client.EndpointUrl, r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	req = req.WithContext(ctx)
 
 	// set content-type
 	req.Header.Set("content-type", "multipart/form-data; boundary="+boundary)
 	req.ContentLength = -1 // unknown
 
-	if (httpClient == nil) {
+	if httpClient == nil {
 		// Create a Transport to explicitly use the http1.1 client
 		// TODO: for some reason, when we use the http2 client flickr API responds
 		// with HTTP: 411 (No Content Length : POST) whereas it should be ok to
@@ -186,10 +189,10 @@ func UploadReaderWithClient(client *FlickrClient, photoReader io.Reader, name st
 	// perform upload request streaming the file
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	apiResp := &UploadResponse{}
 	err = parseApiResponse(resp, apiResp)
-	return apiResp, err
+	return apiResp, &cancel, err
 }
